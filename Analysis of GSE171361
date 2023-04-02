@@ -1,0 +1,341 @@
+# *****************************************************
+# Title: Methylation Analysis for GSE171361
+
+# Methylation Analysis file for GSE171361
+#
+# Author: Heba Abushama 
+# Email: Heba.Abushama@ucdconnect.ie
+# Date: 17/11/2022
+#
+# *****************************************************
+# Clear R's memory 
+rm(list=ls())   
+
+# Set the working directory 
+setwd("/Volumes/HEBA'S USB/R Studio") 
+
+# *****************************************************
+# Step 1 - Load libraries ----
+library(GEOquery)
+library(stringr)
+library(ggplot2)
+library(RColorBrewer)
+library(writexl)
+library(beepr)
+library(dplyr)
+library(ggVennDiagram)
+library(patchwork)
+library(minfi)
+library(DMRcate)
+library(minfiData)
+library(limma)
+library(maxprobes)
+library(devtools)
+library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
+library(IlluminaHumanMethylation450kmanifest)
+
+# *****************************************************
+# Step 1 - Load in data and files
+
+# Loading in samples
+# Load in IDAT files for all samples
+dataDirectory_all <- "/Volumes/HEBA'S USB/FourthYear/Bioinformatics/Datasets/GSE171361"
+list.files(dataDirectory_all, recursive = TRUE)
+
+# Load in IDAT files for controls 
+dataDirectory_controls <- "/Volumes/HEBA'S USB/FourthYear/Bioinformatics/Datasets/GSE171361 controls"
+list.files(dataDirectory_controls, recursive = TRUE)
+
+
+
+# Get the 450K annotation data
+ann450K <- getAnnotation("IlluminaHumanMethylation450kanno.ilmn12.hg19")
+head(ann450K)
+
+
+
+# Load in annotation files
+# Load in annotation file for GSE171361 controls
+targets_controls <- read.metharray.sheet("/Volumes/HEBA'S USB/FourthYear/Bioinformatics/", pattern="GSE171361_controls_annotations_file.csv")
+targets_controls
+targets_controls$X <- NULL
+
+# Load in annotation file for GSE171361
+targets <- read.metharray.sheet("/Volumes/HEBA'S USB/FourthYear/Bioinformatics/", pattern="GSE171361_annotations_file.csv")
+targets
+targets$X <- NULL
+
+
+
+# Read in raw data by linking annotation file to IDAT files
+# Read in the raw data for all ---
+RGSet <- read.metharray.exp(base = dataDirectory_all, targets = targets, verbose=T)
+RGSet
+
+# Read in the raw data for controls ---
+RGSet_controls <- read.metharray.exp(base = dataDirectory_controls, targets = targets_controls, verbose=T)
+RGSet_controls
+
+
+ 
+# Give the samples descriptive names for both sets
+sampleNames(RGSet) <- targets$GEO_accession_number
+sampleNames(RGSet_controls) <- targets$GEO_accession_number
+RGSet
+
+# *****************************************************
+# Step 2 - Quality control  ----
+# Calculate the detection p-values
+detP <- detectionP(RGSet)
+ead(detP)
+dim(detP)
+
+# Make the detection p-values of the samples a dataframe
+c = as.data.frame(detP)
+
+# Calculate the average p-value per column (sample)
+d = colMeans(c)
+
+# Make the average p-values calculated into a dataframe
+e = as.data.frame(d)
+
+# ?
+e <- cbind(rownames(e),e)
+
+
+# Rename column names in new dataframe
+rownames(e) <- NULL
+colnames(e) <- c(names(e)) #to not write all the column names
+colnames(e)[1] <- "GEO Accession number" 
+colnames(e)[2] <- "Mean detection p-values" 
+names(e)
+
+# ?
+par(mar= c(5,4,4,5))
+
+# Add p-values generated into targets file
+targets$pvalue = d
+
+# Rename column names in the targets file
+colnames(targets)
+colnames(targets)[1] = "GEO_Accession_number"
+targets$GEO_Accession_number
+
+# Plot the average p-values per sample in a barchart
+options(scipen=999)
+q <- ggplot(targets, 
+            mapping = aes(x=GEO_Accession_number, 
+                          y=pvalue, 
+                          fill = factor(targets$Diagnosis))) + 
+  geom_bar(stat = "identity", colour="black") +
+  ggtitle("Mean Detection P-value of Samples in GSE171361 ") +
+  labs(x='GEO Accession Number',              # Set axis titles
+       y='Mean Detection P-values') +  
+   ggeasy::easy_center_title() +
+  theme_classic()                          # Set background to white
+q + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+
+
+t <- ggplot(targets, 
+            mapping = aes(x=GEO_Accession_number, 
+                          y=pvalue, 
+                          fill = factor(targets$Diagnosis))) + 
+  geom_bar(stat = "identity", colour="black") +
+  ggtitle("Mean Detection P-value of Samples in GSE171361 ") +
+  labs(x='GEO Accession Number',              # Set axis titles
+       y='Mean Detection P-values') +  
+  ylim(0, 0.05) + 
+  geom_hline(yintercept=0.05,  color = "red") +
+  theme_classic()                          # Set background to white
+t + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+
+
+# Generate quality control report
+qcReport(RGSet, sampNames=targets$GEO_accession_number, sampGroups=targets$Diagnosis, 
+         pdf="qcReport.pdf")
+
+
+# Calculate the detection p-values
+detP_controls <- detectionP(RGSet_controls)
+head(detP_controls)
+
+# Remove poor quality samples
+keep <- colMeans(detP_controls) < 0.05
+RGSet_controls <- RGSet_controls[,keep]
+RGSet_controls
+
+# Remove poor quality samples from targets data
+targets_cont <- targets_cont[keep,]
+targets_cont[,1:5]
+
+# Remove poor quality samples from detection p-value table
+detP_controls <- detP_controls[,keep]
+dim(detP_controls)
+
+# Add p-values generated into targets controls file
+targets_cont$pvalue = d
+
+# Rename column names in the targets controls file
+colnames(targets_cont)
+colnames(targets_cont)[1] = "GEO_Accession_number"
+targets$GEO_Accession_number
+
+
+targets_cont = subset(targets_controls, Diagnosis == "control")
+
+view(targets_controls)
+t <- ggplot(targets_cont, 
+            mapping = aes(x=GEO_Accession_number, 
+                          y=pvalue, 
+                          fill = factor(targets$Diagnosis))) + 
+  geom_bar(stat = "identity", colour="black") +
+  ggtitle("Mean Detection P-value of Samples in GSE171361 ") +
+  labs(x='GEO Accession Number',              # Set axis titles
+       y='Mean Detection P-values') +  
+  ylim(0, 0.05) + 
+  geom_hline(yintercept=0.05,  color = "red") +
+  theme_classic()                          # Set background to white
+t + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+
+# *****************************************************
+# Step 3 - Normalisation  ----
+# Normalize the data to create a GenomicRatioSet object
+mSetSq <- preprocessQuantile(RGSet_controls) 
+
+
+# Create a MethylSet object from the raw data for plotting
+mSetRaw <- preprocessRaw(RGSet_controls)
+
+
+# Visualise what the data looks like before and after normalisation
+par(mfrow=c(1,2))
+densityPlot(RGSet_controls, sampGroups=targets_controls ,main="Raw", legend=FALSE)
+densityPlot(getBeta(mSetSq), sampGroups=targets_controls,
+            main="Normalized", legend=FALSE)
+
+plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
+legend("topleft", legend=levels(factor(targets_controls$GEO_accession_number)),
+       bg="white", text.col=brewer.pal(8,"Dark2"))
+
+
+# *****************************************************
+# Step 4 - Data Exploration  ----
+# Create MDS plots to look at largest sources of variation
+pal <- brewer.pal(8,"Dark2")
+plotMDS(getM(mSetSq),  main="Principal Component 1 vs Principal Component 2 (49% Variance)", top=1000, gene.selection="common",
+        col=pal[factor(targets_controls)], pch=19)
+
+plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
+legend("top", legend=levels(factor(targets_controls$GEO.accession.number)), text.col=pal,
+       bg="white", cex=0.7)
+
+
+# Examine higher dimensions to look at other sources of variation
+par(mfrow=c(1,3))
+plotMDS(getM(mSetSq), main="Principal Component 1 vs Principal Component 3 (48% Variance)", top=1000, gene.selection="common", 
+        col=factor(targets_controls), dim=c(1,3), pch=19)
+
+plotMDS(getM(mSetSq), main="Principal Component 2 vs Principal Component 3 (37% Variance)", top=1000, gene.selection="common", 
+        col=factor(targets_controls), dim=c(2,3), pch=19)
+
+plotMDS(getM(mSetSq), main="Principal Component 3 vs Principal Component 4 (35% Variance)",top=1000, gene.selection="common", 
+        col=factor(targets_controls), dim=c(3,4), pch=19)
+
+plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
+legend("top", legend=levels(factor(targets_controls)), text.col=pal,
+       bg="white", cex=0.7)
+
+
+
+# *****************************************************
+# Step 5 - Filtering  ----
+# Ensure probes are in the same order in the mSetSq and detP objects
+detP_controls <- detP_controls[match(featureNames(mSetSq),rownames(detP_controls)),] 
+
+# Filtering datasets to exclude:
+# 1. Poor performing probes
+# Remove any probes that have failed in one or more samples
+keep <- rowSums(detP_controls < 0.01) == ncol(mSetSq) 
+keep = as.data.frame(keep)
+table(keep)
+
+mSetSqFlt <- mSetSq[keep,]
+mSetSqFlt
+
+# 2. probes that cover snp
+# Remove probes with SNPs at CpG site
+mSetSqFlt <- dropLociWithSnps(mSetSqFlt)
+mSetSqFlt
+
+
+
+# 3. cross reactive probes
+# Exclude cross reactive probes 
+if (! ("devtools" %in% installed.packages())) install.packages("devtools")
+    devtools::install_github("markgene/maxprobes", force = T)
+    
+    
+mSetSqFlt <- dropXreactiveLoci(mSetSqFlt)
+
+?dropXreactiveLoci
+
+mSetSqFlt <- mSetSqFlt[keep,] 
+mSetSqFlt
+
+# 4. non cpg sitea at cpA and CpT
+#Remove non-CpG sites (dropCH) and SNP (dropRS) probes (which measure SNPS not just probes containing SNPs)
+mSetSqFlt <- dropMethylationLoci(mSetSqFlt, dropRS = FALSE, dropCH = TRUE) #No difference to msetSq_filted_
+mSetSqFlt
+
+
+# MDS
+plotMDS(getM(mSetSqFlt), top=1000, main="Principal Component 1 vs Principal Component 2 (84% Variance)", gene.selection="common", 
+        col=pal[factor(targets_controls)], cex=0.8, pch=19)
+legend("right", legend=levels(factor(targets_controls$GEO_accession_number)), text.col=pal,
+       cex=0.65, bg="white")
+
+
+# calculate M-values for statistical analysis
+mVals <- getM(mSetSqFlt)
+head(mVals[,1:5])
+
+
+# calculate B-values for statistical analysis
+bVals <- getBeta(mSetSqFlt)
+head(bVals[,1:5])
+
+par(mfrow=c(1,2))
+densityPlot(bVals, sampGroups=targets_controls, main="Beta values", 
+            legend=FALSE, xlab="Beta values")
+densityPlot(mVals, sampGroups=targets_controls, main="M-values", 
+            legend=FALSE, xlab="M values")
+
+plot(NULL ,xaxt='n',yaxt='n',bty='n',ylab='',xlab='', xlim=0:1, ylim=0:1)
+legend("topleft", legend = levels(factor(targets$Diagnosis)), 
+       text.col=brewer.pal(8,"Dark2"))
+
+
+# *****************************************************
+# Step 8 - Export as csv --- 
+
+bVals1 = as.data.frame(bVals)
+
+bVals1 <- bVals1 %>% rename("V1" = "U1",
+                            "V2" = "U2",
+                            "V3" = "U3",
+                            "V4" = "U4",
+                            "V5" = "U5",
+                            "V6" = "U6")
+
+write.csv(bVals1,file="/Volumes/HEBA'S USB/R Studio/GSE171361_BValues.csv")
+
+mVals1 = as.data.frame(mVals)
+mVals1 <- mVals1 %>% rename("V1" = "U1",
+                            "V2" = "U2",
+                            "V3" = "U3",
+                            "V4" = "U4",
+                            "V5" = "U5",
+                            "V6" = "U6")
+
+write.csv(mVals1,file="/Volumes/HEBA'S USB/R Studio/GSE171361_MValues.csv")
+
