@@ -1,0 +1,244 @@
+# *****************************************************
+# Title: Principal Component Analysis for GSE171361 and GSE116338
+
+# Principal Component Analysis Chartsfor GSE171361 (ureter control samples) and GSE116338 (PCa) Beta Values
+#
+# Author: Heba Abushama 
+# Email: Heba.Abushama@ucdconnect.ie
+# Date: 21/1/23
+#
+# *****************************************************
+# Clear R's memory 
+rm(list=ls())   
+
+# Set the working directory 
+setwd("/Volumes/HEBA'S USB/R Studio") 
+
+# *****************************************************
+# Step 1 - Load libraries ----
+library(ggplot2)
+library(ggfortify)
+library(ggbiplot)
+library(pheatmap)
+
+install.packages("ggplot2")
+install.packages("ggfortify")
+install.packages("ggbiplot")
+install.packages("pheatmap")
+
+# *****************************************************
+# Step 2 - Load data ----
+# Import in data from GSE116338 (PCa B Values)
+GSE116338_Bvals = read.csv("/Volumes/HEBA'S USB/R Studio/450K_Bval_Alex.csv")
+
+# Import in data from GSE171361 (Ureter B Values)
+GSE171361_Bvals = read.csv("/Volumes/HEBA'S USB/R Studio/GSE171361_BValues.csv")
+head(GSE171361_Bvals)
+
+# Import in data for phenotypic data
+Phenotypic_Data = read.csv("/Volumes/HEBA'S USB/R Studio/Phenotypic_Data3.csv")
+
+
+# *****************************************************
+# Step 3 - Filter through to Keep Probes of Interest in Each Dataset for Beta Values ----
+# Filter through to keep following probes:
+# cg15398152
+# cg04392209
+# cg07060551
+# cg09263516
+# cg15287806
+# cg19255007
+# cg06746774
+# cg21250356
+# cg19120717
+# cg24574793
+# cg27073361
+# cg03827327
+# cg10637292
+# cg00098304
+
+# PCa
+# Identify Probes in GSE116338 B values Dataset 
+GSE116338_Bvals_total = dplyr::filter(
+  GSE116338_Bvals, ID %in% c("cg07060551", "cg15398152", "cg00098304", 
+                             "cg10637292", "cg03827327", "cg27073361", 
+                             "cg19120717",  "cg24574793", "cg09263516",
+                             "cg15287806", "cg19255007", "cg06746774", 
+                             "cg21250356"))
+
+# Remove unwanted columns from dataset
+GSE116338_Bvals_total$Chromosome = NULL
+GSE116338_Bvals_total$Start = NULL
+GSE116338_Bvals_total$End = NULL
+GSE116338_Bvals_total$End = NULL
+GSE116338_Bvals_total$Strand = NULL
+GSE116338_Bvals_total$Mean = NULL
+GSE116338_Bvals_total$Mean.1 = NULL
+GSE116338_Bvals_total$Mean.2 = NULL
+GSE116338_Bvals_total$Mean.3 = NULL
+GSE116338_Bvals_total$Mean.4 = NULL
+GSE116338_Bvals_total$Mean.5 = NULL
+
+# Rename any columns
+colnames(GSE116338_Bvals_total)[1]  <- "Probe_ID"
+
+# Transpose previous data to have CpG name as column name
+GSE116338_Bvals_total_trans = t(GSE116338_Bvals_total)
+
+#  Make data into dataframe
+GSE116338_Bvals_total_trans1 <- data.frame("Probe_ID"=rownames(GSE116338_Bvals_total_trans), GSE116338_Bvals_total_trans)
+
+# Rename the heading as the first row
+colnames(GSE116338_Bvals_total_trans1) <- GSE116338_Bvals_total_trans1[1,]
+
+# Remove first row and first column 
+GSE116338_Bvals_total_trans2 <- GSE116338_Bvals_total_trans1[-1,-1]
+
+
+
+
+# Ureter
+# Identify Probes in GSE171361 B values Dataset 
+GSE171361_Bvals_total = dplyr::filter(
+  GSE171361_Bvals, X %in% c("cg07060551", "cg15398152", "cg00098304", 
+                            "cg10637292", "cg03827327", "cg27073361", 
+                            "cg19120717",  "cg24574793", "cg09263516",
+                            "cg15287806", "cg19255007", "cg06746774", 
+                            "cg21250356"))
+
+# Rename column names of dataframe
+colnames(GSE171361_Bvals_total) = c('Probe_ID','UC1', 'UC2', 'UC3', 'UC4', 'UC5', 'UC6')
+
+# Transpose previous data to have CpG name as column name
+GSE171361_Bvals_total_trans = t(GSE171361_Bvals_total)
+
+#  Make data into dataframe
+GSE171361_Bvals_total_trans1 <- data.frame("Probe_ID"=rownames(GSE171361_Bvals_total_trans), GSE171361_Bvals_total_trans)
+
+# Rename the heading as the first row
+colnames(GSE171361_Bvals_total_trans1) <- GSE171361_Bvals_total_trans1[1,]
+
+# Remove first row 
+GSE171361_Bvals_total_trans2 <- GSE171361_Bvals_total_trans1[-1,]
+
+# Remove Probe_ID column  
+GSE171361_Bvals_total_trans2$Probe_ID = NULL
+
+
+
+
+
+
+
+# *****************************************************
+# Step 4 - Organise Phenotypic Data frame for Legend for Graphs ----
+# Rename column
+colnames(Phenotypic_Data)[1]  <- "Probe_ID" 
+
+# Extract only the first 18 rows
+pheno = head(Phenotypic_Data, - 5) 
+
+# Assign rownames to dataframe
+rownames(pheno) <- c("B01","B02","B03","B04","B05",
+                     "B06","B08","B10","B11","B12",  "PIA01", "PIA02", "PIA03", 
+                     "PIA05", "PIA07", "PIA09", "PIA10",
+                     "HGPIN01","HGPIN02","HGPIN05","HGPIN06","HGPIN07","HGPIN08", 
+                     "PCI01", "PCI02", "PCI04", "PCI05", 
+                     "PCI06", "PCI10", "PCI13", "PCA01","PCA02","PCA03","PCA05","PCA06",
+                     "PCA08","PCA09","PCA10","PCM01", "PCM03", "PCM04", "PCM05", "PCM07","PCM11",
+                     "UC1", "UC2","UC3","UC4","UC5","UC6" )
+
+# Remove Probe_ID column  
+pheno$Probe_ID = NULL
+
+
+
+
+
+
+
+
+# *****************************************************
+# Step 5 - Combine all dataframes ----
+
+# Merge the two datasets (ureter + prostate cancer) via column name
+Bval = rbind(GSE116338_Bvals_total_trans2, GSE171361_Bvals_total_trans2)
+
+# Check the structure of the merged dataset
+str(Bval)
+
+# Numbers are taken to be characters, change them to be a numerical variable
+Bval = as.data.frame(lapply(Bval,as.numeric))
+
+# Assign rownames to dataframe
+rownames(Bval) <- c("B01","B02","B03","B04","B05", "B06","B08","B10","B11","B12", 
+                    "PIA01", "PIA02", "PIA03", 
+                    "PIA05", "PIA07", "PIA09", "PIA10",
+                    "HGPIN01","HGPIN02","HGPIN05","HGPIN06","HGPIN07","HGPIN08", 
+                    "PCI01", "PCI02", "PCI04", "PCI05", 
+                    "PCI06", "PCI10", "PCI13","PCA01","PCA02","PCA03","PCA05","PCA06",
+                    "PCA08","PCA09","PCA10","PCM01", "PCM03", "PCM04", "PCM05", "PCM07","PCM11",
+                    "UC1", "UC2","UC3","UC4","UC5","UC6")
+
+# Merge the two datasets (merged ureter + prostate cancer AND phenotypic data) via row name
+Bval_total1 = merge(Bval, pheno, by=0)
+
+# Assign rownames
+rownames(Bval_total1) <- Bval_total1$Row.names
+
+# Extract columns needed
+Bval_total = Bval_total1[,c("cg07060551", "cg15398152", "cg15287806", 
+                            "cg00098304", "cg10637292", "cg03827327", 
+                            "cg27073361", "cg19120717", "cg21250356", 
+                            "cg24574793", "cg09263516", "cg19255007",
+                            "cg06746774",  "Diagnosis_Group")]
+
+
+
+# *****************************************************
+# Step 6 - Make Component Analysis Plots ----
+# Identify groups in the diagnosis group
+unique(Bval_total$Diagnosis_Group) 
+Bval_total$Diagnosis_Group = factor(Bval_total$Diagnosis_Group,
+                                    levels = c("Non-Cancerous Ureter Samples (n=6)",
+                                               "Benign Prostate Samples (n=10)",
+                                               "Proliferative Inflammatory Atrophy Samples (n=7)",
+                                               "High-grade Prostatic Intraepithelial Neoplasia Samples (n=6)",
+                                               "Prostate Cancer Indolent Samples (n=7)",
+                                               "Prostate Cancer Aggressive Samples (n=8)",                                             
+                                               "Prostate Cancer Metastatic Samples (n=6)"))
+
+# Compute principal components
+pca <- prcomp(Bval_total[, c("cg07060551", "cg15398152", "cg15287806", 
+                             "cg00098304", "cg10637292", "cg03827327", 
+                             "cg27073361", "cg19120717", "cg21250356", 
+                             "cg24574793", "cg09263516", "cg19255007",
+                             "cg06746774")], scale. = TRUE)
+
+# Create data frame with principal components and group information
+pca_df <- data.frame(pca$x, group = Bval_total$Diagnosis_Group)
+
+# Create a color palette for the groups
+colors <- c("Non-Cancerous Ureter Samples (n=6)" = '#6e297c',
+            "Benign Prostate Samples (n=10)"= '#FFFFFF', 
+            "Proliferative Inflammatory Atrophy Samples (n=7)" = "#F5B1AF", 
+            "High-grade Prostatic Intraepithelial Neoplasia Samples (n=6)" = "#EE564E",
+            "Prostate Cancer Indolent Samples (n=7)" = "#EE574F",
+            "Prostate Cancer Aggressive Samples (n=8)" = "#ED3833",                                             
+            "Prostate Cancer Metastatic Samples (n=6)" =  "#B32824")
+
+
+# Create the plot
+a = ggplot(pca_df, aes(x = PC1, y = PC2)) +
+  geom_point(aes(color = group)) +
+  scale_color_manual(values = colors) +
+  theme_classic()
+
+
+a + guides(color = guide_legend(title = "Diagnosis Group")) + geom_point(size = 2, pch=21, color = "black") + 
+  ggtitle("Principal Component 1 vs Principal Component 2 (66.62% Variance)") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+a
+
+# *****************************************************
